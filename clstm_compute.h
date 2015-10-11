@@ -175,6 +175,8 @@ void gradient_clip(Mat &d, Float m = 100.0);
 // FIXME: refactor into forward_/backward_
 struct NoNonlin {
   static constexpr const char *kind = "Linear";
+  static inline Float nonlin(Float x) { return x; }
+  static inline Float yderiv(Float y) { return 1; }
   template <class T>
   static void f(T &x) {}
   template <class T, class U>
@@ -183,6 +185,8 @@ struct NoNonlin {
 
 struct SigmoidNonlin {
   static constexpr const char *kind = "Sigmoid";
+  static inline Float nonlin(Float x) { return sigmoid(x); }
+  static inline Float yderiv(Float y) { return y*(1-y); }
   template <class T>
   static void f(T &x) {
     x = MAPFUN(x, sigmoid);
@@ -194,6 +198,8 @@ struct SigmoidNonlin {
 };
 struct TanhNonlin {
   static constexpr const char *kind = "Tanh";
+  static inline Float nonlin(Float x) { return tanh(x); }
+  static inline Float yderiv(Float y) { return 1-y*y; }
   template <class T>
   static void f(T &x) {
     x = MAPFUN(x, tanh_);
@@ -205,6 +211,8 @@ struct TanhNonlin {
 };
 struct ReluNonlin {
   static constexpr const char *kind = "Relu";
+  static inline Float nonlin(Float x) { return relu_(x); }
+  static inline Float yderiv(Float y) { return heavi_(y); }
   template <class T>
   static void f(T &x) {
     x = MAPFUN(x, relu_);

@@ -1,8 +1,57 @@
 #include "clstm_compute.h"
+#include <unsupported/Eigen/CXX11/Tensor>
+#include <iostream>
 
 #define A array()
 
+namespace {
+using namespace std;
+inline void debug() { cerr << endl; }
+
+template <class T>
+inline void debug(const T &arg) {
+  using namespace std;
+  cerr << arg << endl;
+}
+
+template <class T, typename... Args>
+inline void debug(T arg, Args... args) {
+  cerr << arg << " ";
+  debug(args...);
+}
+}
+
 namespace ocropus {
+
+typedef Eigen::Tensor<Float, 2, Eigen::ColMajor> TensorMat;
+typedef Eigen::Tensor<Float, 2, Eigen::RowMajor> TensorMatR;
+typedef Eigen::TensorMap<TensorMat> TensorMap;
+using Eigen::array;
+using Eigen::IndexPair;
+
+array<IndexPair<int>, 1> indexes(int a0, int a1) {
+  array<IndexPair<int>, 1> result = {IndexPair<int>(a0, a1)};
+  return result;
+}
+
+struct TBatch {
+  TensorMap v,d;
+  TBatch(Batch &batch) 
+    : v(batch.data(), {batch.rows(), batch.cols()}),
+    d(batch.d.data(), {batch.d.rows(), batch.d.cols()}) {
+      // for (int i = 0; i < n; i++) rev[i] = n - i - 1;
+      // dest = src.swap_layout().shuffle(rev);
+    }
+};
+struct TParams {
+  TensorMap v,d;
+  TParams(Params &params) 
+    : v(params.data(), {params.rows(), params.cols()}),
+    d(params.d.data(), {params.d.rows(), params.d.cols()}) {
+      // for (int i = 0; i < n; i++) rev[i] = n - i - 1;
+      // dest = src.swap_layout().shuffle(rev);
+    }
+};
 
 #define DOT(M, V) ((M) * (V))
 #define MATMUL(A, B) ((A) * (B))
@@ -69,6 +118,7 @@ template void backward_full1<ReluNonlin>(Batch &y, Params &W, Batch &x,
                                          Float gc);
 
 // compute non-linear full layers
+#if 0
 template <class F>
 void forward_full(Batch &y, Params &W, Batch &x) {
   y = nonlin<F>(MATMUL(W, x));
@@ -80,6 +130,31 @@ void backward_full(Batch &y, Params &W, Batch &x, Float gc) {
   x.d += MATMUL_TR(W, temp);
   W.d += MATMUL_RT(temp, x);
 }
+#else
+template <class F>
+void forward_full_(TBatch y, TParams W, TBatch x) {
+  debug("fwd", "y", y.v.dimension(0), y.v.dimension(1), "W", W.v.dimension(0), W.v.dimension(1), "x", x.v.dimension(0), x.v.dimension(1));
+  Float (*f)(Float) = F::nonlin;
+  y.v = W.v.contract(x.v, indexes(1,0)).unaryExpr(f);
+}
+template <class F>
+void backward_full_(TBatch y, TParams W, TBatch x, Float gc) {
+  Float (*g)(Float) = F::yderiv;
+  TensorMat temp = y.v.unaryExpr(g) * y.d;
+  x.d += W.v.contract(temp, indexes(0,0));
+  W.d += temp.contract(x.v, indexes(1,1));
+}
+template <class F>
+void forward_full(Batch &y, Params &W, Batch &x) {
+  debug("fwd", "y", y.rows(), y.cols(), "W", W.rows(), W.cols(), "x", x.rows(), x.cols());
+  forward_full_<F>(y, W, x);
+}
+template <class F>
+void backward_full(Batch &y, Params &W, Batch &x, Float gc) {
+  backward_full_<F>(y, W, x, gc);
+}
+#endif
+
 template void forward_full<NoNonlin>(Batch &y, Params &W, Batch &x);
 template void forward_full<SigmoidNonlin>(Batch &y, Params &W, Batch &x);
 template void forward_full<TanhNonlin>(Batch &y, Params &W, Batch &x);
