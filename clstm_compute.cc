@@ -133,7 +133,6 @@ void backward_full(Batch &y, Params &W, Batch &x, Float gc) {
 #else
 template <class F>
 void forward_full_(TBatch y, TParams W, TBatch x) {
-  debug("fwd", "y", y.v.dimension(0), y.v.dimension(1), "W", W.v.dimension(0), W.v.dimension(1), "x", x.v.dimension(0), x.v.dimension(1));
   Float (*f)(Float) = F::nonlin;
   y.v = W.v.contract(x.v, indexes(1,0)).unaryExpr(f);
 }
@@ -146,7 +145,6 @@ void backward_full_(TBatch y, TParams W, TBatch x, Float gc) {
 }
 template <class F>
 void forward_full(Batch &y, Params &W, Batch &x) {
-  debug("fwd", "y", y.rows(), y.cols(), "W", W.rows(), W.cols(), "x", x.rows(), x.cols());
   forward_full_<F>(y, W, x);
 }
 template <class F>
