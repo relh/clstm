@@ -4,7 +4,7 @@ import sys
 import os.path
 import distutils.sysconfig
 
-if "deriv" in COMMAND_LINE_TARGETS:
+if "deriv" in COMMAND_LINE_TARGETS or "cderiv" in COMMAND_LINE_TARGETS:
     ARGUMENTS["double"] = "1"
     ARGUMENTS["debug"] = "1"
 
@@ -164,7 +164,7 @@ if option("hdf5lib", "") != "":
 # A simple test of the C++ LSTM implementation.
 
 program = env.Program("test-lstm", ["test-lstm.cc"], LIBS=[libclstm] + libs)
-test_alias = Alias('test', [program], program[0].abspath)
+test_alias = Alias('simple', [program], program[0].abspath)
 AlwaysBuild(test_alias)
 
 # Derivative checking for the major layer types. This recompiles the
@@ -174,7 +174,8 @@ deriv = env.Program("test-deriv", ["test-deriv.cc"], LIBS=[libclstm] + libs)
 deriv_alias = Alias('deriv', [deriv], deriv[0].abspath)
 AlwaysBuild(deriv_alias)
 
-cderiv = env.Program("test-cderiv", ["test-cderiv.cc"], LIBS=[libclstm] + libs)
+cderiv = env.Program("test-cderiv", ["test-cderiv.cc", "clstm_compute.cc"], 
+    LIBS= libs)
 cderiv_alias = Alias('cderiv', [cderiv], cderiv[0].abspath)
 AlwaysBuild(cderiv_alias)
 
@@ -199,3 +200,5 @@ Alias('pyinstall',
 Alias('pyswig', [pyswig])
 pytest = Alias('pytest', [pyswig], 'python test-lstm.py')
 AlwaysBuild(pytest)
+
+AlwaysBuild(Alias('test', 'test-cderiv'))

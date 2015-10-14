@@ -57,9 +57,9 @@ struct CLSTMText {
     int index = 0;
     for (int i = 0; i < neps; i++) seq[index++].setZero(d, 1);
     for (int pos = 0; pos < cs.size(); pos++) {
-      seq[index].setZero(d, 1);
+      seq[index].setZero(d,1);
       seq[index++](cs[pos], 0) = 1.0;
-      for (int i = 0; i < neps; i++) seq[index++].setZero(d, 1);
+      for (int i = 0; i < neps; i++) seq[index++].setZero(d,1);
     }
     assert(index == seq.size());
     seq.check();
@@ -72,7 +72,7 @@ struct CLSTMText {
     mktargets(targets, transcript, nclasses);
     ctc_align_targets(aligned, net->outputs, targets);
     for (int t = 0; t < aligned.size(); t++)
-      net->outputs[t].d = aligned[t] - net->outputs[t];
+      net->outputs[t].d = aligned[t].v - net->outputs[t].v;
     net->backward();
     net->update();
     Classes output_classes;
@@ -100,7 +100,7 @@ struct CLSTMText {
   }
   void get_outputs(mdarray<float> &outputs) {
     Sequence &o = net->outputs;
-    outputs.resize(int(o.size()), int(o[0].rows()));
+    outputs.resize(int(o.size()), int(o.rows()));
     for (int t = 0; t < outputs.dim(0); t++)
       for (int c = 0; c < outputs.dim(1); c++)
         outputs(t, c) = net->outputs[t](c, 0);
@@ -142,7 +142,7 @@ struct CLSTMOCR {
     mktargets(targets, transcript, nclasses);
     ctc_align_targets(aligned, net->outputs, targets);
     for (int t = 0; t < aligned.size(); t++)
-      net->outputs[t].d = aligned[t] - net->outputs[t];
+      net->outputs[t].d = aligned[t].v - net->outputs[t].v;
     net->backward();
     net->update();
     Classes outputs;

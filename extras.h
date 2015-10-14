@@ -109,9 +109,9 @@ inline string getdef(std::map<string, string> &m, const string &key,
 // print the arguments to cerr
 
 inline void debug(Mat &b, string prefix = "") {
-  for (int i = 0; i < b.rows(); i++) {
+  for (int i = 0; i < rows(b); i++) {
     cerr << prefix;
-    for (int j = 0; j < b.cols(); j++) {
+    for (int j = 0; j < cols(b); j++) {
       cerr << " " << b(i, j);
     }
     cerr << endl;
@@ -119,9 +119,9 @@ inline void debug(Mat &b, string prefix = "") {
 }
 
 inline void debugT(Mat &b, string prefix = "") {
-  for (int j = 0; j < b.cols(); j++) {
+  for (int j = 0; j < cols(b); j++) {
     cerr << prefix << ".T";
-    for (int i = 0; i < b.rows(); i++) {
+    for (int i = 0; i < rows(b); i++) {
       cerr << " " << b(i, j);
     }
     cerr << endl;
@@ -321,13 +321,14 @@ inline void transpose(T &a) {
   assign(a, temp);
 }
 
+#if 0
 template <class T>
 inline void assign(Sequence &seq, T &a) {
   assert(a.rank() == 2);
   seq.resize(a.dim(0));
   for (int t = 0; t < a.dim(0); t++) {
     seq[t].resize(a.dim(1), 1);
-    for (int i = 0; i < a.dim(1); i++) seq[t](i, 0) = a(t, i);
+    for (int i = 0; i < a.dim(1); i++) seq[t].v(i, 0) = a(t, i);
   }
 }
 
@@ -335,9 +336,10 @@ template <class T>
 inline void assign(T &a, Sequence &seq) {
   a.resize(int(seq.size()), int(seq[0].size()));
   for (int t = 0; t < a.dim(0); t++) {
-    for (int i = 0; i < a.dim(1); i++) a(t, i) = seq[t](i);
+    for (int i = 0; i < a.dim(1); i++) a(t, i) = seq[t].v(i,0);
   }
 }
+#endif
 
 template <class A, class T>
 inline int indexof(A &a, const T &t) {

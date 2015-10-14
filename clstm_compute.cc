@@ -1,8 +1,5 @@
 #include "clstm_compute.h"
-#include <unsupported/Eigen/CXX11/Tensor>
 #include <iostream>
-
-#define A array()
 
 namespace {
 using namespace std;
@@ -23,87 +20,90 @@ inline void debug(T arg, Args... args) {
 
 namespace ocropus {
 
-typedef Eigen::Tensor<Float, 2, Eigen::ColMajor> TensorMat;
-typedef Eigen::Tensor<Float, 2, Eigen::RowMajor> TensorMatR;
-typedef Eigen::TensorMap<TensorMat> TensorMap;
-using Eigen::array;
-using Eigen::IndexPair;
-
-array<IndexPair<int>, 1> indexes(int a0, int a1) {
-  array<IndexPair<int>, 1> result = {IndexPair<int>(a0, a1)};
-  return result;
-}
-
-struct TBatch {
-  TensorMap v,d;
-  TBatch(Batch &batch) 
-    : v(batch.data(), {batch.rows(), batch.cols()}),
-    d(batch.d.data(), {batch.d.rows(), batch.d.cols()}) {
-      // for (int i = 0; i < n; i++) rev[i] = n - i - 1;
-      // dest = src.swap_layout().shuffle(rev);
-    }
-};
-struct TParams {
-  TensorMap v,d;
-  TParams(Params &params) 
-    : v(params.data(), {params.rows(), params.cols()}),
-    d(params.d.data(), {params.d.rows(), params.d.cols()}) {
-      // for (int i = 0; i < n; i++) rev[i] = n - i - 1;
-      // dest = src.swap_layout().shuffle(rev);
-    }
-};
-
-#define DOT(M, V) ((M) * (V))
-#define MATMUL(A, B) ((A) * (B))
-#define MATMUL_TR(A, B) ((A).transpose() * (B))
-#define MATMUL_RT(A, B) ((A) * (B).transpose())
-#define EMUL(U, V) ((U).array() * (V).array()).matrix()
-#define EMULV(U, V) ((U).array() * (V).array()).matrix()
-#define TRANPOSE(U) ((U).transpose())
-#define COL(A, b) (A).col(b)
-#define MAPFUNC(M, F) ((M).unaryExpr(F))
-#define SUMREDUCE(M) float(M.sum())
-#define BLOCK(A, i, j, n, m) (A).block(i, j, n, m)
-#define CBUTFIRST(M) BLOCK((M), 0, 1, (M).rows(), (M).cols() - 1)
-#define CFIRST(M) COL(M, 0)
-#define HOMDOT(A1, B) (DOT(CBUTFIRST(A1), B).colwise() + CFIRST(A1))
+#define MAPFUNC(X,F) (X).unaryExpr(F)
 
 inline void ADDCOLS(Mat &m, Vec &v) {
-  for (int i = 0; i < COLS(m); i++)
-    for (int j = 0; j < ROWS(m); j++) m(j, i) += v(j);
+//   for (int i = 0; i < COLS(m); i++)
+//     for (int j = 0; j < ROWS(m); j++) m(j, i) += v(j);
 }
 
 void gradient_clip(Sequence &s, Float m) {
-  if (m < 0) return;
-  for (int t = 0; t < s.size(); t++) {
-    s[t].d =
-        MAPFUNC(s[t].d, [m](Float x) { return x > m ? m : x < -m ? -m : x; });
-  }
+//   if (m < 0) return;
+//   for (int t = 0; t < s.size(); t++) {
+//     s[t].d =
+//         MAPFUNC(s[t].d, [m](Float x) { return x > m ? m : x < -m ? -m : x; });
+//   }
 }
 
 void gradient_clip(Mat &d, Float m) {
-  if (m < 0) return;
-  d = MAPFUNC(d, [m](Float x) { return x > m ? m : x < -m ? -m : x; });
+//   if (m < 0) return;
+//   d = MAPFUNC(d, [m](Float x) { return x > m ? m : x < -m ? -m : x; });
 }
 
 void gradient_clip(Batch &b, Float m) { gradient_clip(b.d, m); }
 
+inline array<IndexPair<int>,1> axes(int i,int j) {
+  array<IndexPair<int>,1> result = {IndexPair<int>(i,j)};
+  return result;
+}
+inline array<ptrdiff_t,1> A(int i) {
+  return array<ptrdiff_t,1>({i});
+}
+inline array<ptrdiff_t,2> A(int i,int j) {
+  return array<ptrdiff_t,2>({i,j});
+}
+inline Eigen::Sizes<1> S(int i) {
+  return Eigen::Sizes<1>({i});
+}
+inline Eigen::Sizes<2> S(int i,int j) {
+  return Eigen::Sizes<2>({i,j});
+}
+
+template <class F>
+void forward_full(Batch &y, Params &W, Batch &x) {
+   Float (*f)(Float) = F::nonlin;
+   y.v = W.v.contract(x.v, axes(1,0)).unaryExpr(f);
+}
+template <class F>
+void backward_full(Batch &y, Params &W, Batch &x, Float gc) {
+   Float (*g)(Float) = F::yderiv;
+   Mat temp = y.v.unaryExpr(g) * y.d;
+   x.d += W.v.contract(temp, axes(0,0));
+   W.d += temp.contract(x.v, axes(1,1));
+}
+
+template void forward_full<NoNonlin>(Batch &y, Params &W, Batch &x);
+template void forward_full<SigmoidNonlin>(Batch &y, Params &W, Batch &x);
+template void forward_full<TanhNonlin>(Batch &y, Params &W, Batch &x);
+template void forward_full<ReluNonlin>(Batch &y, Params &W, Batch &x);
+template void backward_full<NoNonlin>(Batch &y, Params &W, Batch &x, Float gc);
+template void backward_full<SigmoidNonlin>(Batch &y, Params &W, Batch &x,
+                                           Float gc);
+template void backward_full<TanhNonlin>(Batch &y, Params &W, Batch &x,
+                                        Float gc);
+template void backward_full<ReluNonlin>(Batch &y, Params &W, Batch &x,
+                                        Float gc);
 template <class F>
 void forward_full1(Batch &y, Params &W1, Batch &x) {
-  y = HOMDOT(W1, x);
-  F::f(y);
+  int n = W1.v.dimension(0), m = W1.v.dimension(1);
+  int bs = x.v.dimension(1);
+  Float (*f)(Float) = F::nonlin;
+  y.v = (W1.v.slice(A(0,1),A(n,m-1)).contract(x.v,axes(1,0)) +
+         W1.v.chip(0,1).reshape(A(n,1)).broadcast(A(1,bs)))
+           .unaryExpr(f);
 }
 template <class F>
 void backward_full1(Batch &y, Params &W1, Batch &x, Float gc) {
-  Mat temp;
-  temp = y.d;
-  F::df(temp, y);
-  x.d = MATMUL_TR(CBUTFIRST(W1), temp);
-  int bs = y.cols();
-  auto d_W = CBUTFIRST(W1.d);
-  d_W += MATMUL_RT(temp, x);
-  auto d_w = CFIRST(W1.d);
-  for (int b = 0; b < bs; b++) d_w += COL(temp, b);
+  int n = W1.v.dimension(0), m = W1.v.dimension(1);
+  Mat W;
+  W = W1.v.slice(A(0,1),A(n,m-1));
+  auto d_W = W1.d.slice(A(0,1),A(n,m-1));
+  auto d_w = W1.d.chip(0,1);
+  Float (*g)(Float) = F::yderiv;
+  Mat temp = y.d * y.v.unaryExpr(g);
+  x.d = W.contract(temp,axes(0,0));
+  d_W += temp.contract(x.v, axes(1,1));
+  d_w += temp.sum(A(1));
 }
 template void forward_full1<NoNonlin>(Batch &y, Params &W, Batch &x);
 template void forward_full1<SigmoidNonlin>(Batch &y, Params &W, Batch &x);
@@ -117,108 +117,61 @@ template void backward_full1<TanhNonlin>(Batch &y, Params &W, Batch &x,
 template void backward_full1<ReluNonlin>(Batch &y, Params &W, Batch &x,
                                          Float gc);
 
-// compute non-linear full layers
-#if 0
-template <class F>
-void forward_full(Batch &y, Params &W, Batch &x) {
-  y = nonlin<F>(MATMUL(W, x));
-}
-template <class F>
-void backward_full(Batch &y, Params &W, Batch &x, Float gc) {
-  Mat temp = EMUL(yprime<F>(y), y.d);
-  gradient_clip(temp, gc);
-  x.d += MATMUL_TR(W, temp);
-  W.d += MATMUL_RT(temp, x);
-}
-#else
-template <class F>
-void forward_full_(TBatch y, TParams W, TBatch x) {
-  Float (*f)(Float) = F::nonlin;
-  y.v = W.v.contract(x.v, indexes(1,0)).unaryExpr(f);
-}
-template <class F>
-void backward_full_(TBatch y, TParams W, TBatch x, Float gc) {
-  Float (*g)(Float) = F::yderiv;
-  TensorMat temp = y.v.unaryExpr(g) * y.d;
-  x.d += W.v.contract(temp, indexes(0,0));
-  W.d += temp.contract(x.v, indexes(1,1));
-}
-template <class F>
-void forward_full(Batch &y, Params &W, Batch &x) {
-  forward_full_<F>(y, W, x);
-}
-template <class F>
-void backward_full(Batch &y, Params &W, Batch &x, Float gc) {
-  backward_full_<F>(y, W, x, gc);
-}
-#endif
-
-template void forward_full<NoNonlin>(Batch &y, Params &W, Batch &x);
-template void forward_full<SigmoidNonlin>(Batch &y, Params &W, Batch &x);
-template void forward_full<TanhNonlin>(Batch &y, Params &W, Batch &x);
-template void forward_full<ReluNonlin>(Batch &y, Params &W, Batch &x);
-template void backward_full<NoNonlin>(Batch &y, Params &W, Batch &x, Float gc);
-template void backward_full<SigmoidNonlin>(Batch &y, Params &W, Batch &x,
-                                           Float gc);
-template void backward_full<TanhNonlin>(Batch &y, Params &W, Batch &x,
-                                        Float gc);
-template void backward_full<ReluNonlin>(Batch &y, Params &W, Batch &x,
-                                        Float gc);
 
 void forward_softmax(Batch &z, Params &W1, Batch &x) {
-  z = MAPFUN(HOMDOT(W1, x), limexp);
-  for (int b = 0; b < COLS(z); b++) {
-    Float total = fmax(SUMREDUCE(COL(z, b)), 1e-9);
-    COL(z, b) /= total;
-  }
+//   z = MAPFUN(HOMDOT(W1, x), limexp);
+//   for (int b = 0; b < COLS(z); b++) {
+//     Float total = fmax(SUMREDUCE(COL(z, b)), 1e-9);
+//     COL(z, b) /= total;
+//   }
 }
 
 void backward_softmax(Batch &z, Params &W1, Batch &x) {
-  x.d = MATMUL_TR(CBUTFIRST(W1), z.d);
-  auto d_W = CBUTFIRST(W1.d);
-  d_W += MATMUL_RT(z.d, x);
-  auto d_w = CFIRST(W1.d);
-  int bs = COLS(z);
-  for (int b = 0; b < bs; b++) d_w += COL(z.d, b);
+//   x.d = MATMUL_TR(CBUTFIRST(W1), z.d);
+//   auto d_W = CBUTFIRST(W1.d);
+//   d_W += MATMUL_RT(z.d, x);
+//   auto d_w = CFIRST(W1.d);
+//   int bs = COLS(z);
+//   for (int b = 0; b < bs; b++) d_w += COL(z.d, b);
 }
 
 void forward_stack(Batch &z, Batch &x, Batch &y) {
-  assert(x.cols() == y.cols());
-  int nx = x.rows();
-  int ny = y.rows();
-  int bs = x.cols();
-  //z.resize(nx + ny, bs);
-  BLOCK(z, 0, 0, nx, bs) = x;
-  BLOCK(z, nx, 0, ny, bs) = y;
+//   assert(x.cols() == y.cols());
+//   int nx = x.rows();
+//   int ny = y.rows();
+//   int bs = x.cols();
+//   //z.resize(nx + ny, bs);
+//   BLOCK(z, 0, 0, nx, bs) = x;
+//   BLOCK(z, nx, 0, ny, bs) = y;
 }
 void backward_stack(Batch &z, Batch &x, Batch &y) {
-  assert(x.cols() == y.cols());
-  int nx = x.rows();
-  int ny = y.rows();
-  int bs = x.cols();
-  x.d += BLOCK(z.d, 0, 0, nx, bs);
-  y.d += BLOCK(z.d, nx, 0, ny, bs);
+//   assert(x.cols() == y.cols());
+//   int nx = x.rows();
+//   int ny = y.rows();
+//   int bs = x.cols();
+//   x.d += BLOCK(z.d, 0, 0, nx, bs);
+//   y.d += BLOCK(z.d, nx, 0, ny, bs);
 }
 
 void forward_stack(Batch &z, Batch &x, Sequence &y, int last) {
-  assert(x.cols() == y.cols());
-  int nx = x.rows();
-  int ny = y.rows();
-  int bs = x.cols();
-  //z.resize(nx + ny, bs);
-  BLOCK(z, 0, 0, nx, bs) = x;
-  if (last >= 0)
-    BLOCK(z, nx, 0, ny, bs) = y[last];
-  else
-    BLOCK(z, nx, 0, ny, bs).setZero();
+//   assert(x.cols() == y.cols());
+//   int nx = x.rows();
+//   int ny = y.rows();
+//   int bs = x.cols();
+//   //z.resize(nx + ny, bs);
+//   BLOCK(z, 0, 0, nx, bs) = x;
+//   if (last >= 0)
+//     BLOCK(z, nx, 0, ny, bs) = y[last];
+//   else
+//     BLOCK(z, nx, 0, ny, bs).setZero();
 }
 void backward_stack(Batch &z, Batch &x, Sequence &y, int last) {
-  assert(x.cols() == y.cols());
-  int nx = x.rows();
-  int ny = y.rows();
-  int bs = x.cols();
-  x.d += BLOCK(z.d, 0, 0, nx, bs);
-  if (last >= 0) y[last].d += BLOCK(z.d, nx, 0, ny, bs);
+//   assert(x.cols() == y.cols());
+//   int nx = x.rows();
+//   int ny = y.rows();
+//   int bs = x.cols();
+//   x.d += BLOCK(z.d, 0, 0, nx, bs);
+//   if (last >= 0) y[last].d += BLOCK(z.d, nx, 0, ny, bs);
 }
 void forward_reverse(Sequence &y, Sequence &x) {
   int N = x.size();
@@ -232,52 +185,50 @@ void backward_reverse(Sequence &y, Sequence &x) {
 
 // stack the delayed output on the input
 void forward_stack1(Batch &all, Batch &inp, Sequence &out, int last) {
-  assert(inp.cols() == out.cols());
-  int bs = inp.cols();
-  int ni = inp.rows();
-  int no = out.rows();
-  int nf = ni + no + 1;
-  //all.resize(nf, bs);
-  BLOCK(all, 0, 0, 1, bs).setConstant(1);
-  BLOCK(all, 1, 0, ni, bs) = inp;
-  if (last < 0)
-    BLOCK(all, 1 + ni, 0, no, bs).setConstant(0);
-  else
-    BLOCK(all, 1 + ni, 0, no, bs) = out[last];
+//   assert(inp.cols() == out.cols());
+//   int bs = inp.cols();
+//   int ni = inp.rows();
+//   int no = out.rows();
+//   int nf = ni + no + 1;
+//   //all.resize(nf, bs);
+//   BLOCK(all, 0, 0, 1, bs).setConstant(1);
+//   BLOCK(all, 1, 0, ni, bs) = inp;
+//   if (last < 0)
+//     BLOCK(all, 1 + ni, 0, no, bs).setConstant(0);
+//   else
+//     BLOCK(all, 1 + ni, 0, no, bs) = out[last];
 }
 void backward_stack1(Batch &all, Batch &inp, Sequence &out, int last) {
-  assert(inp.cols() == out.cols());
-  int bs = inp.cols();
-  int ni = inp.rows();
-  int no = out.rows();
-  int nf = ni + no + 1;
-  inp.d += BLOCK(all.d, 1, 0, ni, bs);
-  if (last >= 0) out[last].d += BLOCK(all.d, 1 + ni, 0, no, bs);
+//   assert(inp.cols() == out.cols());
+//   int bs = inp.cols();
+//   int ni = inp.rows();
+//   int no = out.rows();
+//   int nf = ni + no + 1;
+//   inp.d += BLOCK(all.d, 1, 0, ni, bs);
+//   if (last >= 0) out[last].d += BLOCK(all.d, 1 + ni, 0, no, bs);
 }
 
 // combine the delayed gated state with the gated input
-void forward_statemem(Batch &state, Batch &ci, Batch &gi, Sequence &states,
-                      int last, Batch &gf) {
-  state = EMUL(ci, gi);
-  if (last >= 0) state += EMUL(gf, states[last]);
+void forward_statemem(Batch &state, Batch &ci, Batch &gi, Sequence &states, int last, Batch &gf) {
+//   state = EMUL(ci, gi);
+//   if (last >= 0) state += EMUL(gf, states[last]);
 }
-void backward_statemem(Batch &state, Batch &ci, Batch &gi, Sequence &states,
-                       int last, Batch &gf) {
-  if (last >= 0) states[last].d.A += state.d.A * gf.A;
-  if (last >= 0) gf.d.A += state.d.A * states[last].A;
-  gi.d.A += state.d.A * ci.A;
-  ci.d.A += state.d.A * gi.A;
+void backward_statemem(Batch &state, Batch &ci, Batch &gi, Sequence &states, int last, Batch &gf) {
+//   if (last >= 0) states[last].d.A += state.d.A * gf.A;
+//   if (last >= 0) gf.d.A += state.d.A * states[last].A;
+//   gi.d.A += state.d.A * ci.A;
+//   ci.d.A += state.d.A * gi.A;
 }
 
 // nonlinear gated output
 template <class H>
 void forward_nonlingate(Batch &out, Batch &state, Batch &go) {
-  out = EMUL(nonlin<H>(state), go);
+//   out = EMUL(nonlin<H>(state), go);
 }
 template <class H>
 void backward_nonlingate(Batch &out, Batch &state, Batch &go) {
-  go.d.A += nonlin<H>(state).A * out.d.A;
-  state.d.A += xprime<H>(state).A * go.A * out.d.A;
+//   go.d.A += nonlin<H>(state).A * out.d.A;
+//   state.d.A += xprime<H>(state).A * go.A * out.d.A;
 }
 
 template void forward_nonlingate<TanhNonlin>(Batch &out, Batch &state,
@@ -296,6 +247,19 @@ template void backward_nonlingate<NoNonlin>(Batch &out, Batch &state,
 template void backward_nonlingate<ReluNonlin>(Batch &out, Batch &state,
                                               Batch &go);
 
+void randunif(Mat &m) {
+  std::random_device rd;
+  std::mt19937 gen(rd());
+  std::uniform_real_distribution<double> randn;
+  for (int i = 0; i < ROWS(m); i++)
+    for (int j = 0; j < COLS(m); j++) m(i, j) = randn(gen);
+}
+void randunif(Vec &v) {
+  std::random_device rd;
+  std::mt19937 gen(rd());
+  std::uniform_real_distribution<double> randn;
+  for (int i = 0; i < ROWS(v); i++) v(i) = randn(gen);
+}
 void randgauss(Mat &m) {
   std::random_device rd;
   std::mt19937 gen(rd());
@@ -312,25 +276,25 @@ void randgauss(Vec &v) {
 void randinit(Mat &m, float s, const string mode) {
   if (mode == "unif") {
     m.setRandom();
-    m = (2 * s * m).array() - s;
+    m = m * Scalar(2*s) - Scalar(s);
   } else if (mode == "pos") {
     m.setRandom();
-    m = m * s;
+    m = m * Scalar(s);
   } else if (mode == "normal") {
     randgauss(m);
-    m = m * s;
+    m = m * Scalar(s);
   }
 }
 void randinit(Vec &m, float s, const string mode) {
   if (mode == "unif") {
     m.setRandom();
-    m = (2 * s * m).array() - s;
+    m = m * Scalar(2 * s) - Scalar(s);
   } else if (mode == "pos") {
     m.setRandom();
-    m = m * s;
+    m = m * Scalar(s);
   } else if (mode == "normal") {
     randgauss(m);
-    m = m * s;
+    m = m * Scalar(s);
   }
 }
 void randinit(Mat &m, int no, int ni, float s, const string mode) {
@@ -367,17 +331,20 @@ typedef vector<Classes> BatchClasses;
 
 Vec timeslice(const Sequence &s, int i, int b) {
   Vec result(s.size());
-  for (int t = 0; t < s.size(); t++) result[t] = s[t](i, b);
+  for (int t = 0; t < s.size(); t++) result[t] = s[t].v(i, b);
   return result;
 }
 
-bool anynan(Batch &a) {
+bool anynan(Mat &a) {
   for (int j = 0; j < ROWS(a); j++) {
     for (int k = 0; k < COLS(a); k++) {
       float x = a(j, k);
       if (isnan(x)) return true;
     }
   }
+}
+bool anynan(Batch &b) {
+  return anynan(b.v) || anynan(b.d);
 }
 bool anynan(Sequence &a) {
   for (int i = 0; i < a.size(); i++)

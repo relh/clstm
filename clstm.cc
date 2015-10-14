@@ -161,14 +161,15 @@ void set_targets(INetwork *net, Sequence &targets) {
   int N = net->outputs.size();
   assert(N == targets.size());
   assert(net->outputs.size() == N);
-  for (int t = 0; t < N; t++) net->outputs[t].d = targets[t] - net->outputs[t];
+  for (int t = 0; t < N; t++) 
+    net->outputs[t].d = targets[t].v - net->outputs[t].v;
 }
 void set_classes(INetwork *net, Classes &classes) {
   int N = net->outputs.size();
   assert(N == classes.size());
   assert(net->outputs.size() == N);
   for (int t = 0; t < N; t++) {
-    net->outputs[t].d = -net->outputs[t];
+    net->outputs[t].d = -net->outputs[t].v;
     net->outputs[t].d(classes[t]) += 1;
   }
 }
@@ -464,10 +465,10 @@ struct GenericNPLSTM : INetwork {
     this->ni = ni;
     this->no = no;
     this->nf = nf;
-    each([weight_dev, mode, no, nf](Params &w) {
+    for(auto w : {WEIGHTS}) {
       randinit(w, no, nf, weight_dev, mode);
       w.zeroGrad();
-    }, WEIGHTS);
+    }
   }
   void postLoad() {
     no = ROWS(WGI);
@@ -509,7 +510,6 @@ struct GenericNPLSTM : INetwork {
       backward_full<F>(go[t], WGO, source[t], gradient_clipping);
       backward_full<F>(gf[t], WGF, source[t], gradient_clipping);
       backward_full<F>(gi[t], WGI, source[t], gradient_clipping);
-      assert(gf[0].d.maxCoeff() == 0);
       backward_stack1(source[t], inputs[t], out, t - 1);
     }
     nsteps += N;

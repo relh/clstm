@@ -2,15 +2,17 @@
 #define clstm_compute__
 
 #include <vector>
-#include <Eigen/Dense>
+// #include <Eigen/Dense>
+#include <unsupported/Eigen/CXX11/Tensor>
 
 namespace ocropus {
 using namespace std;
 
-#define ROWS(A) (A).rows()
-#define COLS(A) (A).cols()
+#define ROWS(A) (A).dimension(0)
+#define COLS(A) (A).dimension(1)
 #define MAPFUN(M, F) ((M).unaryExpr(ptr_fun(F)))
 
+#if 0
 #ifdef LSTM_DOUBLE
 typedef double Float;
 typedef Eigen::VectorXi iVec;
@@ -22,6 +24,39 @@ typedef Eigen::VectorXi iVec;
 typedef Eigen::VectorXf Vec;
 typedef Eigen::MatrixXf Mat;
 #endif
+#else
+#ifdef LSTM_DOUBLE
+typedef double Float;
+#else
+typedef float Float;
+#endif
+typedef Eigen::Tensor<Float, 2, Eigen::ColMajor> Mat;
+typedef Eigen::Tensor<Float, 1, Eigen::ColMajor> Vec;
+using Eigen::array;
+typedef Mat::Scalar Scalar;
+using Eigen::IndexPair;
+inline int rows(const Mat &a) { return a.dimension(0); }
+inline int cols(const Mat &a) { return a.dimension(1); }
+#endif
+
+inline Float dot(const Vec &u, const Vec &v) {
+    assert(u.dimension(0)==v.dimension(0));
+    double total = 0.0;
+    for (int i=0; i<u.dimension(0); i++)
+      total += u(i) * v(i);
+    return total;
+}
+
+inline int argmax(const Vec &v) {
+  int mi = 0;
+  Float mv = v(0);
+  for(int i=1;i<v.dimension(0);i++) {
+    if(v(i)<=v(0)) continue;
+    mi = i;
+    mv = v(i);
+  }
+  return mi;
+}
 
 template <typename F, typename T>
 void each(F f, T &a) {
@@ -74,50 +109,50 @@ inline Mat nonlin(T &a) {
 }
 template <class NONLIN, class T>
 inline Mat yprime(T &a) {
-  Mat result = Mat::Ones(ROWS(a), COLS(a));
+  Mat result;
+  result.resize(ROWS(a), COLS(a));
+  result.setConstant(1);
   NONLIN::df(result, a);
   return result;
 }
 template <class NONLIN, class T>
 inline Mat xprime(T &a) {
-  Mat result = Mat::Ones(ROWS(a), COLS(a));
+  Mat result;
+  result.resize(ROWS(a), COLS(a));
+  result.setConstant(1);
   Mat temp = a;
   NONLIN::f(temp);
   NONLIN::df(result, temp);
   return result;
 }
 
-struct Batch : Mat {
+struct Batch {
+  Mat v;
   Mat d;
-  template <class T>
-  void operator=(T other) {
-    (Mat &)*this = other;
-    zeroGrad();
+  int rows() const { return v.dimension(0); }
+  int cols() const { return v.dimension(1); }
+  Mat &operator+() { return v; }
+  void setZero() {
+    v.setConstant(0);
+    d.setConstant(0);
+  }
+  void setZero(int n, int m) {
+    v.resize(n, m);
+    d.resize(n, m);
+    setZero();
   }
   void resize(int n, int m) {
     setZero(n, m);
-    d.setZero(n, m);
   }
-  void zeroGrad() { d.setZero(rows(), cols()); }
+  void zeroGrad() { 
+    d.resize(rows(), cols());
+    d.setConstant(0);
+  }
 };
-struct Params : Mat {
-  Mat d;
-  template <class T>
-  void operator=(T other) {
-    (Mat &)*this = other;
-    zeroGrad();
-  }
-  void resize(int n, int m) {
-    setZero(n, m);
-    d.setZero(n, m);
-  }
-  void zeroGrad() {
-    d.setZero(rows(), cols());
-    assert(d.rows() > 0);
-  }
+struct Params : Batch {
   void update(Float lr, Float mom) {
-    *this += lr *d;
-    d *= mom;
+    v += d * Scalar(lr);
+    d = d * Scalar(mom);
   }
 };
 
@@ -145,7 +180,6 @@ struct Sequence {
     steps.resize(n);
     for (int t = 0; t < n; t++) {
       steps[t].setZero(rows, cols);
-      steps[t].d.setZero(rows, cols);
     }
   }
   void like(const Sequence &other) {
