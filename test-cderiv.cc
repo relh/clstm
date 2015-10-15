@@ -8,6 +8,7 @@
 #include <string>
 #include "extras.h"
 #include "clstm_compute.h"
+#include <fenv.h>
 
 using std_string = std::string;
 #define string std_string
@@ -24,6 +25,13 @@ using namespace ocropus;
 typedef vector<Params> ParamVec;
 
 double sqr(double x) { return x * x; }
+
+void info(Sequence &s,string l="") {
+  for(int t=0; t<s.size(); t++) {
+    print(l, s[t].v.minimum(), s[t].v.maximum(), 
+          "d:", s[t].d.minimum(), s[t].d.maximum());
+  }
+}
 
 double randu() {
   static int count = 1;
@@ -173,6 +181,7 @@ void test_net(Testcase &tc) {
     for (int i = 0; i < ninput; i++) {
       for (int b = 0; b < bs; b++) {
         Minimizer minerr;
+        bool absolute = false;
         for (float h = 1e-6; h < 1.0; h *= 10) {
           tc.inputs = inputs;
           tc.outputs.like(targets);
@@ -189,7 +198,7 @@ void test_net(Testcase &tc) {
           double num_deriv = (out1 - out) / h;
           double error = fabs(1.0 - num_deriv / a_deriv / -2.0);
           if (verbose > 1)
-            print(t, i, b, ":", error, h, "/", num_deriv, a_deriv, out1, out);
+            print("[",t, i, b, "]:", error, "@", h, "/", num_deriv, a_deriv, out1, out);
           minerr.add(error, h);
         }
         if (verbose) print("deltas", t, i, b, minerr.value, minerr.param);
@@ -257,7 +266,16 @@ struct TestStack : Testcase {
   void forward() { forward_stack(outputs[0], inputs[0], inputs[1]); }
   void backward() { backward_stack(outputs[0], inputs[0], inputs[1]); }
 };
-struct TestStack1 : Testcase {
+struct TestStackDelay : Testcase {
+  virtual void init() {
+    randseq(inputs, 2, 7, 4);
+    randseq(targets, 1, 14, 4);
+    randparams(ps, {});
+  }
+  void forward() { forward_stack(outputs[0], inputs[0], inputs, 1); }
+  void backward() { backward_stack(outputs[0], inputs[0], inputs, 1); }
+};
+struct TestStack1Delay : Testcase {
   virtual void init() {
     randseq(inputs, 2, 7, 4);
     randseq(targets, 1, 15, 4);
@@ -266,25 +284,49 @@ struct TestStack1 : Testcase {
   void forward() { forward_stack1(outputs[0], inputs[0], inputs, 1); }
   void backward() { backward_stack1(outputs[0], inputs[0], inputs, 1); }
 };
-struct TestStatemem : Testcase {
+struct TestReverse : Testcase {
   virtual void init() {
     randseq(inputs, 5, 7, 4);
+    randseq(targets, 5, 7, 4);
+    randparams(ps, {});
+  }
+  void forward() { forward_reverse(outputs, inputs); }
+  void backward() { backward_reverse(outputs, inputs); }
+};
+struct TestStatemem : Testcase {
+  virtual void init() {
+    randseq(inputs, 4, 7, 4);
     randseq(targets, 1, 7, 4);
     randparams(ps, {});
   }
-  void forward() { forward_statemem(inputs[0], inputs[1], inputs[2], inputs, 3, inputs[4]); }
-  void backward() { backward_statemem(inputs[0], inputs[1], inputs[2], inputs, 3, inputs[4]); }
+  void forward() { forward_statemem(outputs[0], inputs[0], inputs[1], inputs, 2, inputs[3]); }
+  void backward() { backward_statemem(outputs[0], inputs[0], inputs[1], inputs, 2, inputs[3]); }
+};
+struct TestNonlingate : Testcase {
+  virtual void init() {
+    randseq(inputs, 2, 7, 4);
+    randseq(targets, 1, 7, 4);
+    randparams(ps, {});
+  }
+  void forward() { forward_nonlingate<TanhNonlin>(outputs[0], inputs[0], inputs[1]);}
+  void backward() { backward_nonlingate<TanhNonlin>(outputs[0], inputs[0], inputs[1]); }
 };
 
+
 int main(int argc, char **argv) {
+  feenableexcept(FE_ALL_EXCEPT & ~FE_INEXACT);
   TRY {
     test_net(*new TestFullSigmoid);
     test_net(*new TestFullTanh);
     test_net(*new TestFull1Sigmoid);
     test_net(*new TestFull1Tanh);
+    // TestSoftmax
     test_net(*new TestStack);
-    test_net(*new TestStack1);
+    test_net(*new TestStackDelay);
+    test_net(*new TestStack1Delay);
+    test_net(*new TestReverse);
     test_net(*new TestStatemem);
+    test_net(*new TestNonlingate);
   }
   CATCH(const char *message) { print("ERROR", message); }
 }

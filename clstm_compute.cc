@@ -171,17 +171,6 @@ void backward_stack(Batch &z, Batch &x, Sequence &y, int last) {
   x.d += z.d.slice(A(0,0),A(nx,bs));
   if(last>=0) y[last].d += z.d.slice(A(nx,0),A(ny,bs));
 }
-
-void forward_reverse(Sequence &y, Sequence &x) {
-  int N = x.size();
-  //y.resize(N, x.rows(), x.cols());
-  for (int i = 0; i < N; i++) y[N - i - 1] = x[i];
-}
-void backward_reverse(Sequence &y, Sequence &x) {
-  int N = x.size();
-  for (int i = 0; i < N; i++) x[N - i - 1].d += y[i].d;
-}
-
 void forward_stack1(Batch &z, Batch &x, Sequence &y, int last) {
   int nx = x.v.dimension(0), ny = y[0].v.dimension(0);
   int bs = x.v.dimension(1);
@@ -195,6 +184,17 @@ void backward_stack1(Batch &z, Batch &x, Sequence &y, int last) {
   int bs = x.v.dimension(1);
   x.d += z.d.slice(A(1,0),A(nx,bs));
   if(last>=0) y[last].d += z.d.slice(A(1+nx,0),A(ny,bs));
+}
+
+
+void forward_reverse(Sequence &y, Sequence &x) {
+  int N = x.size();
+  //y.resize(N, x.rows(), x.cols());
+  for (int i = 0; i < N; i++) y[N - i - 1] = x[i];
+}
+void backward_reverse(Sequence &y, Sequence &x) {
+  int N = x.size();
+  for (int i = 0; i < N; i++) x[N - i - 1].d += y[i].d;
 }
 
 void forward_statemem(Batch &state, Batch &ci, Batch &gi, Sequence &states, int last, Batch &gf) {
