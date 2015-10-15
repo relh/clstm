@@ -201,4 +201,4 @@ Alias('pyswig', [pyswig])
 pytest = Alias('pytest', [pyswig], 'python test-lstm.py')
 AlwaysBuild(pytest)
 
-AlwaysBuild(Alias('test', 'test-cderiv'))
+AlwaysBuild(Alias('test', 'test-deriv'))

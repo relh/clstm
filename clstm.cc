@@ -280,7 +280,7 @@ struct Full : INetwork {
   void initialize() {
     int no = attr.get("noutput");
     int ni = attr.get("ninput");
-    randinit(W1, no, ni + 1, 0.01);
+    randinit(W1.v, no, ni + 1, 0.01);
     W1.zeroGrad();
   }
   int noutput() { return W1.rows(); }
@@ -318,11 +318,11 @@ struct SoftmaxLayer : INetwork {
     int no = attr.get("noutput");
     int ni = attr.get("ninput");
     if (no < 2) THROW("Softmax requires no>=2");
-    randinit(W1, no, ni + 1, 0.01);
+    randinit(W1.v, no, ni + 1, 0.01);
     W1.zeroGrad();
   }
-  int noutput() { return ROWS(W1); }
-  int ninput() { return COLS(W1) - 1; }
+  int noutput() { return W1.rows(); }
+  int ninput() { return W1.cols() - 1; }
   void postLoad() { W1.zeroGrad(); }
   void forward() {
     outputs.resize(inputs.size(), W1.rows(), inputs.cols());
@@ -465,14 +465,14 @@ struct GenericNPLSTM : INetwork {
     this->ni = ni;
     this->no = no;
     this->nf = nf;
-    for(auto w : {WEIGHTS}) {
-      randinit(w, no, nf, weight_dev, mode);
-      w.zeroGrad();
-    }
+    randinit(WGI, no, nf, weight_dev, mode);
+    randinit(WGF, no, nf, weight_dev, mode);
+    randinit(WGO, no, nf, weight_dev, mode);
+    randinit(WCI, no, nf, weight_dev, mode);
   }
   void postLoad() {
-    no = ROWS(WGI);
-    nf = COLS(WGI);
+    no = WGI.rows();
+    nf = WGI.cols();
     assert(nf > no);
     ni = nf - no - 1;
   }
@@ -487,7 +487,7 @@ struct GenericNPLSTM : INetwork {
     ci.resize(N, no, bs);
     outputs.resize(N, no, bs);
     for (int t = 0; t < N; t++) {
-      int bs = COLS(inputs[t]);
+      int bs = inputs[t].cols();
       forward_stack1(source[t], inputs[t], outputs, t - 1);
       forward_full<F>(gi[t], WGI, source[t]);
       forward_full<F>(gf[t], WGF, source[t]);

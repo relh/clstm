@@ -39,7 +39,7 @@ inline int rows(const Mat &a) { return a.dimension(0); }
 inline int cols(const Mat &a) { return a.dimension(1); }
 #endif
 
-inline Float dot(const Vec &u, const Vec &v) {
+inline Float dot0(const Vec &u, const Vec &v) {
     assert(u.dimension(0)==v.dimension(0));
     double total = 0.0;
     for (int i=0; i<u.dimension(0); i++)
@@ -294,6 +294,8 @@ void backward_full(Batch &y, Params &W, Batch &x, Float gc);
 
 void randgauss(Mat &m);
 void randgauss(Vec &v);
+void randinit(Params &m, int no, int ni, float s, const string mode = "unif");
+void randinit(Params &m, float s, const string mode = "unif");
 void randinit(Mat &m, float s, const string mode = "unif");
 void randinit(Vec &m, float s, const string mode = "unif");
 void randinit(Mat &m, int no, int ni, float s, const string mode = "unif");

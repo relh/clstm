@@ -57,11 +57,13 @@ bool proto_verbose =
     getenv("clstm_proto_verbose") && atoi(getenv("clstm_proto_verbose"));
 
 void proto_of_Mat(clstm::Array *array, Mat &a, bool weights = true) {
-  array->add_dim(a.rows());
-  array->add_dim(a.cols());
+  int n = a.dimension(0);
+  int m = a.dimension(1);
+  array->add_dim(n);
+  array->add_dim(m);
   if (!weights) return;
-  for (int i = 0; i < a.rows(); i++)
-    for (int j = 0; j < a.cols(); j++) array->add_value(a(i, j));
+  for (int i = 0; i < n; i++)
+    for (int j = 0; j < m; j++) array->add_value(a(i, j));
 }
 
 void proto_of_Vec(clstm::Array *array, Vec &a, bool weights = true) {
@@ -74,13 +76,15 @@ void Mat_of_proto(Mat &a, const clstm::Array *array) {
   if (array->dim_size() != 2)
     throwf("bad format (Mat, %s, %d)", array->name().c_str(),
            array->dim_size());
-  a.resize(array->dim(0), array->dim(1));
+  int n = array->dim(0);
+  int m = array->dim(1);
+  a.resize(n,m);
   a.setZero();
   if (array->value_size() > 0) {
     if (array->value_size() != a.size()) THROW("bad size (Mat)");
     int k = 0;
-    for (int i = 0; i < a.rows(); i++)
-      for (int j = 0; j < a.cols(); j++) a(i, j) = array->value(k++);
+    for (int i = 0; i < n; i++)
+      for (int j = 0; j < m; j++) a(i, j) = array->value(k++);
   }
 }
 
@@ -126,7 +130,7 @@ void proto_of_net(clstm::NetworkProto *proto, INetwork *net,
     string name = it.first;
     clstm::Array *array = proto->add_weights();
     array->set_name(name);
-    proto_of_Mat(array, *a, weights);
+    proto_of_Mat(array, a->v, weights);
   }
   for (int i = 0; i < net->sub.size(); i++) {
     clstm::NetworkProto *subproto = proto->add_sub();
@@ -163,7 +167,8 @@ Network net_of_proto(const clstm::NetworkProto *proto) {
   for (int i = 0; i < proto->weights_size(); i++) {
     string key = proto->weights(i).name();
     Params *a = weights[key];
-    Mat_of_proto(*a, &proto->weights(i));
+    Mat_of_proto(a->v, &proto->weights(i));
+    a->zeroGrad();
   }
   for (int i = 0; i < proto->sub_size(); i++) {
     net->add(net_of_proto(&proto->sub(i)));

@@ -288,6 +288,11 @@ void randinit(Vec &m, float s, const string mode) {
     m = m * Scalar(s);
   }
 }
+void randinit(Params &p, int no, int ni, float s, const string mode) {
+  p.v.resize(no, ni);
+  randinit(p.v, s, mode);
+  p.zeroGrad();
+}
 void randinit(Mat &m, int no, int ni, float s, const string mode) {
   m.resize(no, ni);
   randinit(m, s, mode);
