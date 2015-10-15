@@ -137,8 +137,6 @@ void test_net(Network net) {
           net->backward();
           double a_deriv = net->inputs[t].d(i, b);
           double error = fabs(1.0 - num_deriv / a_deriv / -2.0);
-          if (error>0.1 || verbose>1) print("   deltas", t, i, b, ":", error,
-            "out", out1, out2, "num", num_deriv, "a", a_deriv, "h", h);
           minerr.add(error, h);
         }
         if (minerr.value>0.1 || verbose) print("deltas", t, i, b, ":", minerr.value, minerr.param);
@@ -172,8 +170,6 @@ void test_net(Network net) {
           double a_deriv = params[k].d(i, j);
           double error = fabs(1.0 - num_deriv / a_deriv / -2.0);
           minerr.add(error, h);
-          if (error>0.1 || verbose>1) print("   params", k, i, j, ":", error,
-            "out", out, out1, "num", num_deriv, "a", a_deriv, "h", h);
         }
         if (minerr.value>0.1 || verbose) print("params", k, i, j, ":", minerr.value, minerr.param);
         maxparamerr.add(minerr.value);

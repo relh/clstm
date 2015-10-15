@@ -10,6 +10,7 @@
 #include <set>
 #include <fstream>
 #include "pstring.h"
+#include "extras.h" // FIXME
 
 #ifndef MAXEXP
 #define MAXEXP 30
@@ -161,7 +162,7 @@ void set_targets(INetwork *net, Sequence &targets) {
   int N = net->outputs.size();
   assert(N == targets.size());
   assert(net->outputs.size() == N);
-  for (int t = 0; t < N; t++) 
+  for (int t = 0; t < N; t++)
     net->outputs[t].d = targets[t].v - net->outputs[t].v;
 }
 void set_classes(INetwork *net, Classes &classes) {
@@ -454,7 +455,7 @@ struct GenericNPLSTM : INetwork {
   int ninput() { return ni; }
   GenericNPLSTM() {
     ENROLL(WGI, WGF, WGO, WCI);
-    ENROLL(gi, gf, go, ci, state);
+    ENROLL(gi, gf, go, ci, state, source);
   }
   void initialize() {
     int ni = attr.get("ninput");
@@ -489,7 +490,6 @@ struct GenericNPLSTM : INetwork {
     for (int t = 0; t < N; t++) {
       int bs = inputs[t].cols();
       forward_stack1(source[t], inputs[t], outputs, t - 1);
-      Vec _t = source[t].v.abs().minimum(); assert(_t(0)>0.0);
       forward_full<F>(gi[t], WGI, source[t]);
       forward_full<F>(gf[t], WGF, source[t]);
       forward_full<F>(go[t], WGO, source[t]);

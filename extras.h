@@ -16,8 +16,8 @@
 #include <stdarg.h>
 #include <glob.h>
 #include "pstring.h"
-
 #include <iostream>
+#include <iomanip>
 
 template <class T>
 inline std::ostream &operator<<(std::ostream &stream, multidim::mdarray<T> &a) {
@@ -50,6 +50,8 @@ using std::ostream;
 using std::cerr;
 using std::endl;
 using std::min;
+using std::setw;
+using std::setprecision;
 using namespace multidim;
 
 void glob(vector<string> &result, const string &arg);
@@ -107,12 +109,28 @@ inline string getdef(std::map<string, string> &m, const string &key,
 }
 
 // print the arguments to cerr
+//
+
+inline void debug(Sequence &s, bool deltas=false) {
+  for(int i=0; i<s.rows(); i++) {
+    for(int t=0; t<s.size(); t++) {
+      cout << setw(4) << " | ";
+      for(int j=0; j<s.cols(); j++) {
+        if(deltas)
+          cout << setw(8) << setprecision(3) << s[t].d(i,j);
+        else
+          cout << setw(8) << setprecision(3) << s[t].v(i,j);
+      }
+    }
+    cout << endl;
+  }
+}
 
 inline void debug(Mat &b, string prefix = "") {
   for (int i = 0; i < rows(b); i++) {
     cerr << prefix;
     for (int j = 0; j < cols(b); j++) {
-      cerr << " " << b(i, j);
+      cerr << setw(8) << setprecision(3) << b(i, j);
     }
     cerr << endl;
   }
@@ -122,7 +140,7 @@ inline void debugT(Mat &b, string prefix = "") {
   for (int j = 0; j < cols(b); j++) {
     cerr << prefix << ".T";
     for (int i = 0; i < rows(b); i++) {
-      cerr << " " << b(i, j);
+      cerr << setw(8) << setprecision(3) << b(i, j);
     }
     cerr << endl;
   }

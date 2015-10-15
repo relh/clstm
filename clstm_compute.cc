@@ -177,7 +177,7 @@ void forward_stack1(Batch &z, Batch &x, Sequence &y, int last) {
   z.v.slice(A(0,0),A(1,bs)).setConstant(Scalar(1));
   z.v.slice(A(1,0),A(nx,bs)) = x.v;
   if(last>=0) z.v.slice(A(1+nx,0),A(ny,bs)) = y[last].v;
-  else z.v.slice(A(nx,0),A(ny,bs)).setZero();
+  else z.v.slice(A(1+nx,0),A(ny,bs)).setZero();
 }
 void backward_stack1(Batch &z, Batch &x, Sequence &y, int last) {
   int nx = x.v.dimension(0), ny = y[0].v.dimension(0);
