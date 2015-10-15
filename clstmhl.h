@@ -58,7 +58,7 @@ struct CLSTMText {
     for (int i = 0; i < neps; i++) seq[index++].setZero(d, 1);
     for (int pos = 0; pos < cs.size(); pos++) {
       seq[index].setZero(d,1);
-      seq[index++](cs[pos], 0) = 1.0;
+      seq[index++].v(cs[pos], 0) = 1.0;
       for (int i = 0; i < neps; i++) seq[index++].setZero(d,1);
     }
     assert(index == seq.size());
@@ -103,9 +103,18 @@ struct CLSTMText {
     outputs.resize(int(o.size()), int(o.rows()));
     for (int t = 0; t < outputs.dim(0); t++)
       for (int c = 0; c < outputs.dim(1); c++)
-        outputs(t, c) = net->outputs[t](c, 0);
+        outputs(t, c) = net->outputs[t].v(c, 0);
   }
 };
+
+inline void assign(Sequence &s,mdarray<float> &image) {
+  int n = image.dim(0);
+  int m = image.dim(1);
+  s.resize(n,m,1);
+  for(int i=0; i<n;i++)
+    for(int j=0; j<m; j++)
+      s[i].v(j,0) = image(i,j);
+}
 
 struct CLSTMOCR {
   unique_ptr<INormalizer> normalizer;
@@ -180,7 +189,7 @@ struct CLSTMOCR {
       int t = where[i];
       int cls = outputs[i];
       wchar_t c = net->codec.decode(outputs[i]);
-      float p = net->outputs[t](cls, 0);
+      float p = net->outputs[t].v(cls, 0);
       CharPrediction pred{i, t, c, p};
       preds.push_back(pred);
     }
@@ -193,7 +202,7 @@ struct CLSTMOCR {
     outputs.resize(int(o.size()), int(o[0].rows()));
     for (int t = 0; t < outputs.dim(0); t++)
       for (int c = 0; c < outputs.dim(1); c++)
-        outputs(t, c) = net->outputs[t](c, 0);
+        outputs(t, c) = net->outputs[t].v(c, 0);
   }
 };
 }

@@ -71,8 +71,13 @@ wstring read_text32(string fname, int maxsize = 65536) {
 }
 
 void show(PyServer &py, Sequence &s, int subplot = 0) {
+  int n = s.size();
+  int m = s.rows();
   mdarray<float> temp;
-  assign(temp, s);
+  temp.resize(n,m);
+  for(int i=0;i<n;i++)
+    for(int j=0;j<m;j++)
+      temp(i,j) = s[i].v(j,0);
   if (subplot > 0) py.evalf("subplot(%d)", subplot);
   py.imshowT(temp, "cmap=cm.hot");
 }

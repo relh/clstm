@@ -306,13 +306,6 @@ inline bool anynan(mdarray<float> &a) {
   return false;
 }
 
-template <class S, class T>
-inline void assign(S &dest, T &src) {
-  dest.resize_(src.dims);
-  int n = dest.size();
-  for (int i = 0; i < n; i++) dest.data[i] = src.data[i];
-}
-
 inline void assign(mdarray<int> &dest, vector<int> &src) {
   int n = src.size();
   dest.resize(n);

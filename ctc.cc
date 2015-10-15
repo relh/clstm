@@ -85,8 +85,10 @@ void ctc_align_targets(Mat &posteriors, Mat &outputs, Mat &targets) {
   forwardbackward(both, lmatch);
 
   // compute normalized state probabilities
-  Float (*f)(Float) = limexp;
-  Mat epath = (both - both.maximum()).unaryExpr(f);
+  Vec m = both.maximum();
+  Mat epath = (both - m(0)).unaryExpr([](Scalar x) {
+    return Scalar(x<-30?exp(-30):x>30?exp(30):exp(x));
+  });
   for (int j = 0; j < n2; j++) {
     Vec l = epath.chip(j,1).sum();
     Float scale = fmax(l(0), 1e-9);
