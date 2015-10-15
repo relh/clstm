@@ -266,6 +266,15 @@ struct TestStack1 : Testcase {
   void forward() { forward_stack1(outputs[0], inputs[0], inputs, 1); }
   void backward() { backward_stack1(outputs[0], inputs[0], inputs, 1); }
 };
+struct TestStatemem : Testcase {
+  virtual void init() {
+    randseq(inputs, 5, 7, 4);
+    randseq(targets, 1, 7, 4);
+    randparams(ps, {});
+  }
+  void forward() { forward_statemem(inputs[0], inputs[1], inputs[2], inputs, 3, inputs[4]); }
+  void backward() { backward_statemem(inputs[0], inputs[1], inputs[2], inputs, 3, inputs[4]); }
+};
 
 int main(int argc, char **argv) {
   TRY {
@@ -275,6 +284,7 @@ int main(int argc, char **argv) {
     test_net(*new TestFull1Tanh);
     test_net(*new TestStack);
     test_net(*new TestStack1);
+    test_net(*new TestStatemem);
   }
   CATCH(const char *message) { print("ERROR", message); }
 }
