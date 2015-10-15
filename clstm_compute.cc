@@ -197,27 +197,29 @@ void backward_stack1(Batch &z, Batch &x, Sequence &y, int last) {
   if(last>=0) y[last].d += z.d.slice(A(1+nx,0),A(ny,bs));
 }
 
-// combine the delayed gated state with the gated input
 void forward_statemem(Batch &state, Batch &ci, Batch &gi, Sequence &states, int last, Batch &gf) {
-//   state = EMUL(ci, gi);
-//   if (last >= 0) state += EMUL(gf, states[last]);
+  state.v = ci.v * gi.v;
+  if (last>=0) state.v += gf.v * states[last].v;
 }
 void backward_statemem(Batch &state, Batch &ci, Batch &gi, Sequence &states, int last, Batch &gf) {
-//   if (last >= 0) states[last].d.A += state.d.A * gf.A;
-//   if (last >= 0) gf.d.A += state.d.A * states[last].A;
-//   gi.d.A += state.d.A * ci.A;
-//   ci.d.A += state.d.A * gi.A;
+  if (last>=0) states[last].d += state.d * gf.v;
+  if (last>=0) gf.d += state.d * states[last].v;
+  gi.d += state.d * ci.v;
+  ci.d += state.d * gi.v;
 }
 
-// nonlinear gated output
 template <class H>
 void forward_nonlingate(Batch &out, Batch &state, Batch &go) {
-//   out = EMUL(nonlin<H>(state), go);
+  Float (*f)(Float) = H::nonlin;
+  out.v = state.v.unaryExpr(f) * go.v;
 }
+
 template <class H>
 void backward_nonlingate(Batch &out, Batch &state, Batch &go) {
-//   go.d.A += nonlin<H>(state).A * out.d.A;
-//   state.d.A += xprime<H>(state).A * go.A * out.d.A;
+  Float (*f)(Float) = H::nonlin;
+  auto g = [](Float x) { return H::yderiv(H::nonlin(x)); };
+  go.d += state.v.unaryExpr(f) * out.d;
+  state.d += state.v.unaryExpr(g) * go.v * out.d;
 }
 
 template void forward_nonlingate<TanhNonlin>(Batch &out, Batch &state,
