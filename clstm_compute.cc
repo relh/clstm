@@ -146,43 +146,32 @@ void backward_softmax(Batch &z, Params &W1, Batch &x) {
 }
 
 void forward_stack(Batch &z, Batch &x, Batch &y) {
-//   assert(x.cols() == y.cols());
-//   int nx = x.rows();
-//   int ny = y.rows();
-//   int bs = x.cols();
-//   //z.resize(nx + ny, bs);
-//   BLOCK(z, 0, 0, nx, bs) = x;
-//   BLOCK(z, nx, 0, ny, bs) = y;
+  int nx = x.v.dimension(0), ny = y.v.dimension(0);
+  int bs = x.v.dimension(1);
+  z.v.slice(A(0,0),A(nx,bs)) = x.v;
+  z.v.slice(A(nx,0),A(ny,bs)) = y.v;
 }
 void backward_stack(Batch &z, Batch &x, Batch &y) {
-//   assert(x.cols() == y.cols());
-//   int nx = x.rows();
-//   int ny = y.rows();
-//   int bs = x.cols();
-//   x.d += BLOCK(z.d, 0, 0, nx, bs);
-//   y.d += BLOCK(z.d, nx, 0, ny, bs);
+  int nx = x.v.dimension(0), ny = y.v.dimension(0);
+  int bs = x.v.dimension(1);
+  x.d += z.d.slice(A(0,0),A(nx,bs));
+  y.d += z.d.slice(A(nx,0),A(ny,bs));
 }
 
 void forward_stack(Batch &z, Batch &x, Sequence &y, int last) {
-//   assert(x.cols() == y.cols());
-//   int nx = x.rows();
-//   int ny = y.rows();
-//   int bs = x.cols();
-//   //z.resize(nx + ny, bs);
-//   BLOCK(z, 0, 0, nx, bs) = x;
-//   if (last >= 0)
-//     BLOCK(z, nx, 0, ny, bs) = y[last];
-//   else
-//     BLOCK(z, nx, 0, ny, bs).setZero();
+  int nx = x.v.dimension(0), ny = y[0].v.dimension(0);
+  int bs = x.v.dimension(1);
+  z.v.slice(A(0,0),A(nx,bs)) = x.v;
+  if(last>=0) z.v.slice(A(nx,0),A(ny,bs)) = y[last].v;
+  else z.v.slice(A(nx,0),A(ny,bs)).setZero();
 }
 void backward_stack(Batch &z, Batch &x, Sequence &y, int last) {
-//   assert(x.cols() == y.cols());
-//   int nx = x.rows();
-//   int ny = y.rows();
-//   int bs = x.cols();
-//   x.d += BLOCK(z.d, 0, 0, nx, bs);
-//   if (last >= 0) y[last].d += BLOCK(z.d, nx, 0, ny, bs);
+  int nx = x.v.dimension(0), ny = y[0].v.dimension(0);
+  int bs = x.v.dimension(1);
+  x.d += z.d.slice(A(0,0),A(nx,bs));
+  if(last>=0) y[last].d += z.d.slice(A(nx,0),A(ny,bs));
 }
+
 void forward_reverse(Sequence &y, Sequence &x) {
   int N = x.size();
   //y.resize(N, x.rows(), x.cols());
@@ -193,29 +182,19 @@ void backward_reverse(Sequence &y, Sequence &x) {
   for (int i = 0; i < N; i++) x[N - i - 1].d += y[i].d;
 }
 
-// stack the delayed output on the input
-void forward_stack1(Batch &all, Batch &inp, Sequence &out, int last) {
-//   assert(inp.cols() == out.cols());
-//   int bs = inp.cols();
-//   int ni = inp.rows();
-//   int no = out.rows();
-//   int nf = ni + no + 1;
-//   //all.resize(nf, bs);
-//   BLOCK(all, 0, 0, 1, bs).setConstant(1);
-//   BLOCK(all, 1, 0, ni, bs) = inp;
-//   if (last < 0)
-//     BLOCK(all, 1 + ni, 0, no, bs).setConstant(0);
-//   else
-//     BLOCK(all, 1 + ni, 0, no, bs) = out[last];
+void forward_stack1(Batch &z, Batch &x, Sequence &y, int last) {
+  int nx = x.v.dimension(0), ny = y[0].v.dimension(0);
+  int bs = x.v.dimension(1);
+  z.v.slice(A(0,0),A(1,bs)).setConstant(Scalar(1));
+  z.v.slice(A(1,0),A(nx,bs)) = x.v;
+  if(last>=0) z.v.slice(A(1+nx,0),A(ny,bs)) = y[last].v;
+  else z.v.slice(A(nx,0),A(ny,bs)).setZero();
 }
-void backward_stack1(Batch &all, Batch &inp, Sequence &out, int last) {
-//   assert(inp.cols() == out.cols());
-//   int bs = inp.cols();
-//   int ni = inp.rows();
-//   int no = out.rows();
-//   int nf = ni + no + 1;
-//   inp.d += BLOCK(all.d, 1, 0, ni, bs);
-//   if (last >= 0) out[last].d += BLOCK(all.d, 1 + ni, 0, no, bs);
+void backward_stack1(Batch &z, Batch &x, Sequence &y, int last) {
+  int nx = x.v.dimension(0), ny = y[0].v.dimension(0);
+  int bs = x.v.dimension(1);
+  x.d += z.d.slice(A(1,0),A(nx,bs));
+  if(last>=0) y[last].d += z.d.slice(A(1+nx,0),A(ny,bs));
 }
 
 // combine the delayed gated state with the gated input
