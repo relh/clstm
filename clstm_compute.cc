@@ -83,6 +83,7 @@ template void backward_full<TanhNonlin>(Batch &y, Params &W, Batch &x,
                                         Float gc);
 template void backward_full<ReluNonlin>(Batch &y, Params &W, Batch &x,
                                         Float gc);
+
 template <class F>
 void forward_full1(Batch &y, Params &W1, Batch &x) {
   int n = W1.v.dimension(0), m = W1.v.dimension(1);
@@ -92,6 +93,7 @@ void forward_full1(Batch &y, Params &W1, Batch &x) {
          W1.v.chip(0,1).reshape(A(n,1)).broadcast(A(1,bs)))
            .unaryExpr(f);
 }
+
 template <class F>
 void backward_full1(Batch &y, Params &W1, Batch &x, Float gc) {
   int n = W1.v.dimension(0), m = W1.v.dimension(1);
@@ -119,20 +121,28 @@ template void backward_full1<ReluNonlin>(Batch &y, Params &W, Batch &x,
 
 
 void forward_softmax(Batch &z, Params &W1, Batch &x) {
-//   z = MAPFUN(HOMDOT(W1, x), limexp);
-//   for (int b = 0; b < COLS(z); b++) {
-//     Float total = fmax(SUMREDUCE(COL(z, b)), 1e-9);
-//     COL(z, b) /= total;
-//   }
+  int n = W1.v.dimension(0), m = W1.v.dimension(1);
+  int bs = x.v.dimension(1);
+  Float (*f)(Float) = limexp;
+  z.v = (W1.v.slice(A(0,1),A(n,m-1)).contract(x.v,axes(1,0)) +
+         W1.v.chip(0,1).reshape(A(n,1)).broadcast(A(1,bs))).unaryExpr(f);
+  for (int b = 0; b < COLS(z.v); b++) {
+    auto v = z.v.chip(b, 1);
+    Vec total = v.sum();
+    Vec v1 = v / Scalar(fmax(total(0), 1e-9));
+    v = v1;
+  }
 }
 
 void backward_softmax(Batch &z, Params &W1, Batch &x) {
-//   x.d = MATMUL_TR(CBUTFIRST(W1), z.d);
-//   auto d_W = CBUTFIRST(W1.d);
-//   d_W += MATMUL_RT(z.d, x);
-//   auto d_w = CFIRST(W1.d);
-//   int bs = COLS(z);
-//   for (int b = 0; b < bs; b++) d_w += COL(z.d, b);
+  int n = W1.v.dimension(0), m = W1.v.dimension(1);
+  auto W = W1.v.slice(A(0,1),A(n,m-1));
+  auto w = W1.v.chip(0,1);
+  auto d_W = W1.d.slice(A(0,1),A(n,m-1));
+  auto d_w = W1.d.chip(0,1);
+  x.d = W.contract(z.d,axes(0,0));
+  d_W += z.d.contract(x.v, axes(1,1));
+  d_w += z.d.sum(A(1));
 }
 
 void forward_stack(Batch &z, Batch &x, Batch &y) {
