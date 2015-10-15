@@ -163,9 +163,9 @@ if option("hdf5lib", "") != "":
 
 # A simple test of the C++ LSTM implementation.
 
-program = env.Program("test-lstm", ["test-lstm.cc"], LIBS=[libclstm] + libs)
-test_alias = Alias('simple', [program], program[0].abspath)
-AlwaysBuild(test_alias)
+delay = env.Program("test-delay", ["test-delay.cc"], LIBS=[libclstm] + libs)
+delay_alias = Alias('delay', [delay], delay[0].abspath)
+AlwaysBuild(delay_alias)
 
 # Derivative checking for the major layer types. This recompiles the
 # entire library with Float=double
