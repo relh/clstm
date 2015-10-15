@@ -489,6 +489,7 @@ struct GenericNPLSTM : INetwork {
     for (int t = 0; t < N; t++) {
       int bs = inputs[t].cols();
       forward_stack1(source[t], inputs[t], outputs, t - 1);
+      Vec _t = source[t].v.abs().minimum(); assert(_t(0)>0.0);
       forward_full<F>(gi[t], WGI, source[t]);
       forward_full<F>(gf[t], WGF, source[t]);
       forward_full<F>(go[t], WGO, source[t]);

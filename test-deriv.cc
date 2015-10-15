@@ -23,7 +23,7 @@ using namespace ocropus;
 double sqr(double x) { return x * x; }
 
 double randu() {
-  static int count = 1;
+  static int count = 177;
   for (;;) {
     double x = cos(count * 3.7);
     count++;
@@ -102,8 +102,8 @@ void test_net(Network net) {
   int bs = 1;
   int ninput = net->ninput();
   int noutput = net->noutput();
-  ;
-  bool verbose = getienv("verbose", 0);
+
+  int verbose = getienv("verbose", 0);
   vector<Params> params, params1;
   get_params(params, net);
   randparams(params);
@@ -112,12 +112,17 @@ void test_net(Network net) {
   randseq(xs, N, ninput, bs);
   randseq(ys, N, noutput, bs);
 
+  net->setLearningRate(1e-4, 0.9);
+  set_inputs(&*net, xs);
+  net->forward();
+  network_info(net);
+
   Maximizer maxinerr;
   for (int t = 0; t < N; t++) {
     for (int i = 0; i < ninput; i++) {
       for (int b = 0; b < bs; b++) {
         Minimizer minerr;
-        for (float h = 1e-6; h < 1.0; h *= 10) {
+        for (float h = 1e-6; h < 0.2; h *= 10) {
           set_inputs(&*net, xs);
           net->forward();
           double out1 = err(net->outputs, ys);
@@ -132,10 +137,11 @@ void test_net(Network net) {
           net->backward();
           double a_deriv = net->inputs[t].d(i, b);
           double error = fabs(1.0 - num_deriv / a_deriv / -2.0);
+          if (error>0.1 || verbose>1) print("   deltas", t, i, b, ":", error,
+            "out", out1, out2, "num", num_deriv, "a", a_deriv, "h", h);
           minerr.add(error, h);
         }
-        if (verbose) print("deltas", t, i, b, minerr.value, minerr.param);
-        assert(minerr.value < 0.1);
+        if (minerr.value>0.1 || verbose) print("deltas", t, i, b, ":", minerr.value, minerr.param);
         maxinerr.add(minerr.value);
       }
     }
@@ -156,7 +162,7 @@ void test_net(Network net) {
     for (int i = 0; i < n; i++) {
       for (int j = 0; j < m; j++) {
         Minimizer minerr;
-        for (float h = 1e-6; h < 1.0; h *= 10) {
+        for (float h = 1e-6; h < 0.2; h *= 10) {
           params1 = params;
           params1[k].v(i, j) += h;
           set_params(net, params1);
@@ -166,14 +172,17 @@ void test_net(Network net) {
           double a_deriv = params[k].d(i, j);
           double error = fabs(1.0 - num_deriv / a_deriv / -2.0);
           minerr.add(error, h);
+          if (error>0.1 || verbose>1) print("   params", k, i, j, ":", error,
+            "out", out, out1, "num", num_deriv, "a", a_deriv, "h", h);
         }
-        if (verbose) print("params", k, i, j, minerr.value, minerr.param);
-        assert(minerr.value < 0.1);
+        if (minerr.value>0.1 || verbose) print("params", k, i, j, ":", minerr.value, minerr.param);
         maxparamerr.add(minerr.value);
       }
     }
   }
   print("OK", maxinerr.value, maxparamerr.value);
+  assert(maxinerr.value < 0.1);
+  assert(maxparamerr.value < 0.1);
 }
 
 int main(int argc, char **argv) {
