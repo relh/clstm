@@ -121,6 +121,7 @@ template void backward_full1<ReluNonlin>(Batch &y, Params &W, Batch &x,
 
 
 void forward_softmax(Batch &z, Params &W1, Batch &x) {
+#if 0
   int n = W1.v.dimension(0), m = W1.v.dimension(1);
   int bs = x.v.dimension(1);
   Float (*f)(Float) = limexp;
@@ -131,10 +132,33 @@ void forward_softmax(Batch &z, Params &W1, Batch &x) {
     Vec total = v.sum();
     Vec v1 = v / Scalar(fmax(total(0), 1e-9));
     v = v1;
+#elif 0
+  int n = ROWS(W1);
+  int m = COLS(W1);
+  int bs = COLS(x);
+  z = MAPFUN(HOMDOT(W1, x), limexp);
+  for (int b = 0; b < bs; b++) {
+    double total = 0.0;
+    for(int i=0; i<n; i++) total += z(i,b);
+    for(int i=0; i<n; i++) z(i,b) /= total;
   }
+#else
+  int n = W1.v.dimension(0);
+  int m = W1.v.dimension(1);
+  int bs = z.v.dimension(1);
+  Float (*f)(Float) = limexp;
+  z.v = (W1.v.slice(A(0,1),A(n,m-1)).contract(x.v,axes(1,0)) +
+         W1.v.chip(0,1).reshape(A(n,1)).broadcast(A(1,bs))).unaryExpr(f);
+  for (int b = 0; b < bs; b++) {
+    double total = 0.0;
+    for(int i=0; i<n; i++) total += z.v(i,b);
+    for(int i=0; i<n; i++) z.v(i,b) /= total;
+  }
+#endif
 }
 
 void backward_softmax(Batch &z, Params &W1, Batch &x) {
+#if 0
   int n = W1.v.dimension(0), m = W1.v.dimension(1);
   auto W = W1.v.slice(A(0,1),A(n,m-1));
   auto w = W1.v.chip(0,1);
@@ -143,6 +167,29 @@ void backward_softmax(Batch &z, Params &W1, Batch &x) {
   x.d = W.contract(z.d,axes(0,0));
   d_W += z.d.contract(x.v, axes(1,1));
   d_w += z.d.sum(A(1));
+#elif 0
+  x.d = MATMUL_TR(CBUTFIRST(W1), z.d);
+  auto d_W = CBUTFIRST(W1.d);
+  d_W += MATMUL_RT(z.d, x);
+  int n = ROWS(W1);
+  int bs = COLS(z);
+  Vec d_w= CFIRST(W1.d);
+  for (int i=0; i<n; i++) 
+    for (int b = 0; b < bs; b++)
+      d_w(i) += z.d(i,b);
+  CFIRST(W1.d) = d_w;
+#else
+  int n = W1.v.dimension(0), m = W1.v.dimension(1);
+  int bs = z.v.dimension(1);
+  auto W = W1.v.slice(A(0,1),A(n,m-1));
+  auto w = W1.v.chip(0,1);
+  auto d_W = W1.d.slice(A(0,1),A(n,m-1));
+  x.d = W.contract(z.d,axes(0,0));
+  d_W += z.d.contract(x.v, axes(1,1));
+  for (int i=0; i<n; i++) 
+    for (int b = 0; b < bs; b++)
+      W1.d(i,0) += z.d(i,b);
+#endif
 }
 
 void forward_stack(Batch &z, Batch &x, Batch &y) {
