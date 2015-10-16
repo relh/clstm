@@ -7,11 +7,14 @@
 #include <math.h>
 #include <Eigen/Dense>
 #include <stdarg.h>
+#include <limits>
 #include "extras.h"
 
 #ifndef MAXEXP
 #define MAXEXP 30
 #endif
+
+#define SIGNAN numeric_limits<float>::signaling_NaN()
 
 namespace ocropus {
 using namespace std;
@@ -21,18 +24,21 @@ void forward_algorithm(Mat &lr, Mat &lmatch, double skip) {
   int n = ROWS(lmatch), m = COLS(lmatch);
   lr.resize(n, m);
   Vec v(m), w(m);
+  assert(v.dimension(0)==m);
+  assert(w.dimension(0)==m);
+  v.setConstant(SIGNAN);
+  w.setConstant(SIGNAN);
   for (int j = 0; j < m; j++) v(j) = skip * j;
   for (int i = 0; i < n; i++) {
-    // w.segment(1, m - 1) = v.segment(0, m - 1);
-    array<int,1> bl{1}, sl{m-1}, br{0}, sr{m-1};
-    w.slice(bl, sl) = v.slice(br, sr);
     w(0) = skip * i;
+    for(int k=1; k<m; k++) w(k) = v(k-1);
     for (int j = 0; j < m; j++) {
-      Float same = log_mul(v(j), lmatch(i, j));
-      Float next = log_mul(w(j), lmatch(i, j));
+      Float cost = lmatch(i, j);
+      Float same = log_mul(v(j), cost);
+      Float next = log_mul(w(j), cost);
       v(j) = log_add(same, next);
     }
-    lr.chip(i, 0) = v;
+    for(int k=0; k<m; k++) lr(i, k) = v(k);
   }
 }
 
@@ -48,6 +54,7 @@ void reverse2(Mat &out, Mat &in) {
 }
 
 void forwardbackward(Mat &both, Mat &lmatch) {
+  int n = ROWS(lmatch), m = COLS(lmatch);
   Mat lr;
   forward_algorithm(lr, lmatch);
   Mat rlmatch;
@@ -72,16 +79,16 @@ void ctc_align_targets(Mat &posteriors, Mat &outputs, Mat &targets) {
   // compute log probability of state matches
   Mat lmatch;
   lmatch.resize(n1, n2);
+  lmatch.setConstant(NAN);
   for (int t1 = 0; t1 < n1; t1++) {
     Vec out = outputs.chip(t1, 0);
     out = out.cwiseMax(Scalar(lo));
     Vec total = out.sum();
     out = out / total(0);
     for (int t2 = 0; t2 < n2; t2++) {
-      Vec target = targets.chip(t2,0);
-      array<IndexPair<int>,1> ax({IndexPair<int>(0,0)});
-      Vec result = out.contract(target, ax);
-      lmatch(t1, t2) = result(0);
+      double total = 0.0;
+      for(int k=0; k<nc; k++) total += outputs(t1,k) * targets(t2,k);
+      lmatch(t1, t2) = Scalar(total);
     }
   }
   // compute unnormalized forward backward algorithm
@@ -152,8 +159,9 @@ void ctc_align_targets(Sequence &posteriors, Sequence &outputs,
 
 void mktargets(Mat &seq, Classes &transcript, int ndim) {
   int n = transcript.size();
-  seq.resize(2 * n + 1, ndim);
-  for (int t = 0; t < n; t++) {
+  int n2 = 2 * n + 1;
+  seq.resize(n2, ndim);
+  for (int t = 0; t < n2; t++) {
     for (int i=0; i<ndim; i++) seq(t,i) = 0;
     if (t % 2 == 1)
       seq(t, transcript[(t - 1) / 2]) = 1;

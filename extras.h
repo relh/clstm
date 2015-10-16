@@ -114,6 +114,8 @@ inline void dprint(T arg, Args... args) {
   dprint(args...);
 }
 
+#define DASSERT(X,...) while(!(X)){dprint("FAILED:",#X,__VA_ARGS__);}
+
 inline string getdef(std::map<string, string> &m, const string &key,
                      const string &dflt) {
   auto it = m.find(key);
