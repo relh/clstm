@@ -101,15 +101,25 @@ inline void print(T arg, Args... args) {
   print(args...);
 }
 
+inline void dprint() { cerr << endl; }
+
+template <class T>
+inline void dprint(const T &arg) {
+  cerr << arg << endl;
+}
+
+template <class T, typename... Args>
+inline void dprint(T arg, Args... args) {
+  cerr << arg << " ";
+  dprint(args...);
+}
+
 inline string getdef(std::map<string, string> &m, const string &key,
                      const string &dflt) {
   auto it = m.find(key);
   if (it == m.end()) return dflt;
   return it->second;
 }
-
-// print the arguments to cerr
-//
 
 inline void debug(Sequence &s, bool deltas=false) {
   for(int i=0; i<s.rows(); i++) {
@@ -144,19 +154,6 @@ inline void debugT(Mat &b, string prefix = "") {
     }
     cerr << endl;
   }
-}
-
-inline void dprint() { cerr << endl; }
-
-template <class T>
-inline void dprint(const T &arg) {
-  cerr << arg << endl;
-}
-
-template <class T, typename... Args>
-inline void dprint(T arg, Args... args) {
-  cerr << arg << " ";
-  dprint(args...);
 }
 
 // get values from the environment, with defaults

@@ -7,6 +7,7 @@
 #include <math.h>
 #include <Eigen/Dense>
 #include <stdarg.h>
+#include "extras.h"
 
 #ifndef MAXEXP
 #define MAXEXP 30
@@ -60,6 +61,9 @@ void forwardbackward(Mat &both, Mat &lmatch) {
 
 
 void ctc_align_targets(Mat &posteriors, Mat &outputs, Mat &targets) {
+  //print("outputs", outputs.dimension(0), outputs.dimension(1));
+  //print("targets", targets.dimension(0), targets.dimension(1));
+  assert(COLS(outputs)==COLS(targets));
   double lo = 1e-5;
   int n1 = ROWS(outputs);
   int n2 = ROWS(targets);
@@ -77,7 +81,7 @@ void ctc_align_targets(Mat &posteriors, Mat &outputs, Mat &targets) {
       Vec target = targets.chip(t2,0);
       array<IndexPair<int>,1> ax({IndexPair<int>(0,0)});
       Vec result = out.contract(target, ax);
-      lmatch(t1, t2) = result(0.0);
+      lmatch(t1, t2) = result(0);
     }
   }
   // compute unnormalized forward backward algorithm
@@ -116,49 +120,61 @@ void ctc_align_targets(Mat &posteriors, Mat &outputs, Mat &targets) {
   posteriors = aligned;
 }
 
+void mat_of_sequence(Mat &a, Sequence &s) {
+  int n = s.size();
+  int m = s.rows();
+  assert(s.cols()==1);
+  a.resize(n, m);
+  for(int t=0;t<n;t++)
+    for(int i=0;i<m;i++)
+      a(t,i) = s[t].v(i,0);
+}
+void sequence_of_mat(Sequence &s, Mat &a) {
+  int n = a.dimension(0);
+  int m = a.dimension(1);
+  s.resize(n,m,1);
+  for(int t=0;t<n;t++)
+    for(int i=0;i<m;i++)
+      s[t].v(i,0) = a(t,i);
+}
+
 void ctc_align_targets(Sequence &posteriors, Sequence &outputs,
                        Sequence &targets) {
-  assert(outputs[0].cols() == 1);
-  assert(targets[0].cols() == 1);
-  int n1 = outputs.rows();
-  int n2 = targets.rows();
-  int nc = targets[0].rows();
-  Mat moutputs(n1, nc);
-  Mat mtargets(n2, nc);
-  for (int i = 0; i < n1; i++) moutputs.chip(i,0) = outputs[i].v.chip(0,1);
-  for (int i = 0; i < n2; i++) mtargets.chip(i,0) = targets[i].v.chip(0,1);
+  //print("outputs", outputs.size(), outputs.rows(), outputs.cols());
+  //print("targets", targets.size(), targets.rows(), targets.cols());
+  Mat moutputs, mtargets;
+  mat_of_sequence(moutputs, outputs);
+  mat_of_sequence(mtargets, targets);
   Mat aligned;
   ctc_align_targets(aligned, moutputs, mtargets);
-  posteriors.resize(n1);
-  for (int i = 0; i < n1; i++) {
-    posteriors[i].resize(aligned.dimension(0), 1);
-    posteriors[i].v.chip(0,1) = aligned.chip(i,0);
+  sequence_of_mat(posteriors,aligned);
+}
+
+void mktargets(Mat &seq, Classes &transcript, int ndim) {
+  int n = transcript.size();
+  seq.resize(2 * n + 1, ndim);
+  for (int t = 0; t < n; t++) {
+    for (int i=0; i<ndim; i++) seq(t,i) = 0;
+    if (t % 2 == 1)
+      seq(t, transcript[(t - 1) / 2]) = 1;
+    else
+      seq(t,0) = 1;
   }
+}
+void mktargets(Sequence &seq, Classes &transcript, int ndim) {
+  Mat targets;
+  mktargets(targets, transcript, ndim);
+  sequence_of_mat(seq, targets);
 }
 
 void ctc_align_targets(Sequence &posteriors, Sequence &outputs,
                        Classes &targets) {
-  int nclasses = outputs[0].rows();
-  Sequence stargets;
-  stargets.resize(targets.size());
-  for (int t = 0; t < stargets.size(); t++) {
-    stargets[t].v.resize(nclasses, 1);
-    stargets[t].v.setConstant(0);
-    stargets[t].v(targets[t], 0) = 1.0;
-  }
-  ctc_align_targets(posteriors, outputs, stargets);
-}
-
-void mktargets(Sequence &seq, Classes &transcript, int ndim) {
-  seq.resize(2 * transcript.size() + 1);
-  for (int t = 0; t < seq.size(); t++) {
-    seq[t].v.resize(ndim,1);
-    seq[t].v.setZero();
-    if (t % 2 == 1)
-      seq[t].v(transcript[(t - 1) / 2]) = 1;
-    else
-      seq[t].v(0) = 1;
-  }
+  Mat moutputs, mtargets;
+  mat_of_sequence(moutputs, outputs);
+  mktargets(mtargets, targets, outputs.rows());
+  Mat aligned;
+  ctc_align_targets(aligned, moutputs, mtargets);
+  sequence_of_mat(posteriors,aligned);
 }
 
 void trivial_decode(Classes &cs, Sequence &outputs, int batch,

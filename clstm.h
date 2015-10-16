@@ -167,6 +167,9 @@ void set_targets(INetwork *net, Sequence &targets);
 void set_targets_accelerated(INetwork *net, Sequence &targets);
 void set_classes(INetwork *net, Classes &classes);
 void set_classes(INetwork *net, BatchClasses &classes);
+void mat_of_sequence(Mat &a, Sequence &s);
+void sequence_of_mat(Sequence &s, Mat &a);
+void mktargets(Mat &seq, Classes &targets, int ndim);
 void mktargets(Sequence &seq, Classes &targets, int ndim);
 
 // instantiating layers and networks
