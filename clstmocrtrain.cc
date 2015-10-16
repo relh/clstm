@@ -12,7 +12,6 @@
 #include <iostream>
 #include <set>
 #include <regex>
-#include <fenv.h>
 #include "multidim.h"
 #include "pymulti.h"
 #include "extras.h"
@@ -102,7 +101,6 @@ wstring separate_chars(const wstring &s, const wstring &charsep) {
 }
 
 int main1(int argc, char **argv) {
-  if(getienv("fpe",1)) feenableexcept(FE_ALL_EXCEPT & ~FE_INEXACT);
   srandomize();
 
   int ntrain = getienv("ntrain", 10000000);

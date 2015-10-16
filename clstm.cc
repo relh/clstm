@@ -10,11 +10,18 @@
 #include <set>
 #include <fstream>
 #include "pstring.h"
+#include <fenv.h>
 #include "extras.h" // FIXME
 
 #ifndef MAXEXP
 #define MAXEXP 30
 #endif
+
+static auto fpe_init = []() {
+  if(getenv("fpe") && atoi(getenv("fpe")))
+    feenableexcept(FE_OVERFLOW|FE_INVALID|FE_DIVBYZERO);
+  return 0;
+};
 
 #include <sys/time.h>
 inline double now() {
