@@ -38,10 +38,14 @@ Optional: HDF5, ZMQ, Python
 
 On Ubuntu, this means:
 
-    sudo apt-get install libeigen3-dev \
-    hdf5-helpers libhdf5-8 libhdf5-cpp-8 libhdf5-dev python-h5py \
-    libprotobuf-dev libprotobuf9 protobuf-compiler \
-    libzmq3-dev libzmq3 libzmqpp-dev libzmqpp3 libpng12-dev
+    sudo apt-get install hdf5-helpers libhdf5-8 libhdf5-cpp-8 \
+    libhdf5-dev python-h5py libprotobuf-dev libprotobuf9 \
+    protobuf-compiler libzmq3-dev libzmq3 libzmqpp-dev \
+    libzmqpp3 libpng12-dev swig
+
+You will need to install the latest version of Eigen from the Bitbucket:
+    
+    `https://bitbucket.org/eigen/eigen/downloads`
 
 There are a bunch of options:
 
